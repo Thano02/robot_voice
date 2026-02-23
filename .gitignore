@@ -1,0 +1,23 @@
+# Clés API — ne jamais committer
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Fichiers Excel avec données prospects (sensibles)
+prospects.xlsx
+
+# Fichiers audio temporaires
+*.mp3
+*.wav
+*.ogg
+
+# IDE
+.idea/
+.vscode/
+*.iml

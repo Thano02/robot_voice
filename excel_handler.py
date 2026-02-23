@@ -38,8 +38,8 @@ def lire_prospects():
         nom         = row[1]  # Colonne B
         statut      = row[2]  # Colonne C
 
-        # On ne traite que les prospects à appeler
-        if statut and statut.strip() == "À appeler":
+        # On ne traite que les prospects à appeler (accepte avec ou sans accent)
+        if statut and statut.strip().lower() in ("à appeler", "a appeler"):
             prospects.append({
                 "numero_ligne": numero_ligne,
                 "telephone":    str(telephone).strip() if telephone else "",
@@ -107,9 +107,9 @@ def creer_fichier_exemple():
 
     # Quelques prospects de test
     prospects_test = [
-        ["+33612345678", "Jean Dupont",    "À appeler", "", "", "", "", "", "", "", ""],
-        ["+33623456789", "Marie Martin",   "À appeler", "", "", "", "", "", "", "", ""],
-        ["+33634567890", "Paul Bernard",   "Traité",    "", "", "", "", "", "", "", ""],
+        ["+33612345678", "Jean Dupont",    "a appeler", "", "", "", "", "", "", "", ""],
+        ["+33623456789", "Marie Martin",   "a appeler", "", "", "", "", "", "", "", ""],
+        ["+33634567890", "Paul Bernard",   "Traite",    "", "", "", "", "", "", "", ""],
     ]
     for p in prospects_test:
         ws.append(p)

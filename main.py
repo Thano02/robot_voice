@@ -126,12 +126,27 @@ async def appel_decroche(request: Request):
 
     # Génère et joue le message d'introduction
     intro = gestionnaire.demarrer()
-    audio = texte_vers_audio(intro)
+    try:
+        audio = texte_vers_audio(intro)
+        twiml = twiml_jouer_audio(audio, f"{BASE_URL}/reponse")
+    except Exception as e:
+        print(f"[ElevenLabs] Erreur TTS : {e}")
+        # Fallback : voix Twilio native si ElevenLabs échoue
+        response = VoiceResponse()
+        gather = Gather(
+            input="speech",
+            action=f"{BASE_URL}/reponse",
+            method="POST",
+            language="fr-FR",
+            speech_timeout="auto",
+            timeout=8,
+        )
+        gather.say(intro, language="fr-FR")
+        response.append(gather)
+        response.redirect(f"{BASE_URL}/silence", method="POST")
+        twiml = str(response)
 
-    return Response(
-        content=twiml_jouer_audio(audio, f"{BASE_URL}/reponse"),
-        media_type="text/xml",
-    )
+    return Response(content=twiml, media_type="text/xml")
 
 
 # --- Webhook : réponse du prospect --------------------------------------------
@@ -178,11 +193,26 @@ async def reponse_prospect(request: Request):
         return Response(content=str(response), media_type="text/xml")
 
     # Continue la conversation
-    audio = texte_vers_audio(replique)
-    return Response(
-        content=twiml_jouer_audio(audio, f"{BASE_URL}/reponse"),
-        media_type="text/xml",
-    )
+    try:
+        audio = texte_vers_audio(replique)
+        twiml = twiml_jouer_audio(audio, f"{BASE_URL}/reponse")
+    except Exception as e:
+        print(f"[ElevenLabs] Erreur TTS : {e}")
+        response = VoiceResponse()
+        gather = Gather(
+            input="speech",
+            action=f"{BASE_URL}/reponse",
+            method="POST",
+            language="fr-FR",
+            speech_timeout="auto",
+            timeout=8,
+        )
+        gather.say(replique, language="fr-FR")
+        response.append(gather)
+        response.redirect(f"{BASE_URL}/silence", method="POST")
+        twiml = str(response)
+
+    return Response(content=twiml, media_type="text/xml")
 
 
 # --- Webhook : silence / pas de réponse ---------------------------------------
@@ -213,12 +243,26 @@ async def silence(request: Request):
     # Relance avec une invite
     gestionnaire: GestionnaireConversation = session["gestionnaire"]
     replique = gestionnaire.repondre("[silence]")
-    audio = texte_vers_audio(replique)
+    try:
+        audio = texte_vers_audio(replique)
+        twiml = twiml_jouer_audio(audio, f"{BASE_URL}/reponse")
+    except Exception as e:
+        print(f"[ElevenLabs] Erreur TTS : {e}")
+        response = VoiceResponse()
+        gather = Gather(
+            input="speech",
+            action=f"{BASE_URL}/reponse",
+            method="POST",
+            language="fr-FR",
+            speech_timeout="auto",
+            timeout=8,
+        )
+        gather.say(replique, language="fr-FR")
+        response.append(gather)
+        response.redirect(f"{BASE_URL}/silence", method="POST")
+        twiml = str(response)
 
-    return Response(
-        content=twiml_jouer_audio(audio, f"{BASE_URL}/reponse"),
-        media_type="text/xml",
-    )
+    return Response(content=twiml, media_type="text/xml")
 
 
 # --- Webhook : résultat AMD (détection messagerie asynchrone) -----------------
@@ -355,7 +399,7 @@ async def _transcrire_enregistrement(recording_url: str) -> str:
         async with httpx.AsyncClient() as client:
             reponse = await client.get(
                 recording_url + ".wav",
-                auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN),
+                auth=(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN")),
                 timeout=15,
             )
         return audio_vers_texte(reponse.content, format_audio="wav")

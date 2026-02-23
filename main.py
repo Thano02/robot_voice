@@ -46,6 +46,9 @@ sessions_actives: dict = {}
 # Les fichiers sont supprimés après avoir été servis une fois
 audio_cache: dict = {}
 
+# Résultats des appels terminés — récupérés par caller.py via GET /resultats
+resultats_en_attente: list = []
+
 
 # --- Endpoint : servir les fichiers audio temporaires -------------------------
 @app.get("/audio/{audio_id}")
@@ -365,10 +368,6 @@ async def lancer_appel(request: Request):
             url=f"{BASE_URL}/appel-decroche?{params_webhook}",
             status_callback=f"{BASE_URL}/statut-appel",
             status_callback_method="POST",
-            machine_detection="DetectMessageEnd",           # Détection messagerie
-            async_amd=True,                                 # Asynchrone : ne bloque pas le décrochage
-            async_amd_status_callback=f"{BASE_URL}/amd-statut",  # Callback AMD dédié
-            async_amd_status_callback_method="POST",
             timeout=30,                                     # Secondes avant "pas répondu"
         )
 
@@ -380,6 +379,18 @@ async def lancer_appel(request: Request):
         return {"erreur": str(e)}
 
 
+# --- Endpoint : récupérer les résultats (appelé par caller.py en local) ------
+@app.get("/resultats")
+async def obtenir_resultats_en_attente():
+    """
+    Retourne les résultats des appels terminés et vide la file d'attente.
+    Appelé périodiquement par caller.py pour écrire les résultats dans Excel en local.
+    """
+    resultats = list(resultats_en_attente)
+    resultats_en_attente.clear()
+    return {"resultats": resultats, "nb": len(resultats)}
+
+
 # --- Fonctions utilitaires privées --------------------------------------------
 
 def _recuperer_numero_ligne(call_sid: str) -> int | None:
@@ -389,15 +400,18 @@ def _recuperer_numero_ligne(call_sid: str) -> int | None:
 
 
 def _sauvegarder_resultats(call_sid: str, gestionnaire: GestionnaireConversation):
-    """Écrit les résultats de la conversation dans Excel."""
+    """Stocke les résultats en mémoire pour que caller.py les récupère via GET /resultats."""
     session = sessions_actives.get(call_sid)
     if not session:
         return
     numero_ligne = session.get("numero_ligne")
     if numero_ligne:
         resultats = gestionnaire.obtenir_resultats()
-        ecrire_resultat(numero_ligne, resultats)
-        print(f"[Excel] Résultats sauvegardés pour ligne {numero_ligne} : {resultats.get('eligibilite')}")
+        resultats_en_attente.append({
+            "numero_ligne": numero_ligne,
+            "donnees":      resultats,
+        })
+        print(f"[Résultats] En attente pour ligne {numero_ligne} : {resultats.get('eligibilite')}")
     _nettoyer_session(call_sid)
 
 

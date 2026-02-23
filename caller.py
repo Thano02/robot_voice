@@ -8,7 +8,7 @@ import asyncio
 import httpx
 from dotenv import load_dotenv
 
-from excel_handler import lire_prospects, marquer_pas_repondu
+from excel_handler import lire_prospects, marquer_pas_repondu, ecrire_resultat
 
 load_dotenv()
 
@@ -147,6 +147,50 @@ def verifier_serveur_disponible(base_url: str) -> bool:
         return False
 
 
+async def poller_resultats(nb_appels: int, timeout_minutes: int = 10):
+    """
+    Attend les résultats des appels depuis Railway et les écrit dans Excel local.
+    Polls GET /resultats toutes les 15 secondes jusqu'à avoir tous les résultats
+    ou jusqu'au timeout.
+    """
+    print(f"\n[Caller] En attente des résultats ({nb_appels} appel(s) en cours)...")
+    print("[Caller] Les résultats seront écrits dans prospects.xlsx au fur et à mesure.")
+
+    resultats_recus = 0
+    debut = time.time()
+    intervalle = 15  # secondes entre chaque poll
+
+    async with httpx.AsyncClient() as client:
+        while resultats_recus < nb_appels:
+            # Timeout global
+            if time.time() - debut > timeout_minutes * 60:
+                print(f"[Caller] Timeout atteint ({timeout_minutes} min). "
+                      f"{resultats_recus}/{nb_appels} résultats reçus.")
+                break
+
+            await asyncio.sleep(intervalle)
+
+            try:
+                reponse = await client.get(f"{BASE_URL}/resultats", timeout=10)
+                data = reponse.json()
+                nouveaux = data.get("resultats", [])
+
+                for item in nouveaux:
+                    numero_ligne = item["numero_ligne"]
+                    donnees      = item["donnees"]
+                    ecrire_resultat(numero_ligne, donnees)
+                    eligibilite = donnees.get("eligibilite", "?")
+                    print(f"[Caller] ✓ Excel mis à jour | Ligne {numero_ligne} | {eligibilite}")
+                    resultats_recus += 1
+
+            except Exception as e:
+                print(f"[Caller] Erreur polling : {e}")
+
+    if resultats_recus >= nb_appels:
+        print(f"\n[Caller] ✓ Tous les résultats sauvegardés ({resultats_recus}/{nb_appels})")
+    print(f"[Caller] Durée totale : {(time.time() - debut) / 60:.1f} min")
+
+
 def main():
     """Point d'entrée principal : lit Excel et lance les appels."""
     print("=" * 50)
@@ -177,11 +221,18 @@ def main():
 
     # Lance les appels de manière asynchrone
     debut = time.time()
-    resultats = asyncio.run(lancer_tous_les_appels(prospects))
+    resultats_lancement = asyncio.run(lancer_tous_les_appels(prospects))
     duree = time.time() - debut
 
-    afficher_bilan(resultats)
+    afficher_bilan(resultats_lancement)
     print(f"\nDurée totale de lancement : {duree:.1f}s")
+
+    # Compte les appels réellement lancés (pas les erreurs immédiates)
+    nb_lances = sum(1 for r in resultats_lancement if r.get("statut") == "lancé")
+
+    if nb_lances > 0:
+        # Attend et récupère les résultats depuis Railway → écrit dans Excel local
+        asyncio.run(poller_resultats(nb_lances))
 
 
 if __name__ == "__main__":

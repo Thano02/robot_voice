@@ -22,14 +22,18 @@ from excel_handler import (
 load_dotenv()
 
 # --- Configuration ------------------------------------------------------------
-TWILIO_ACCOUNT_SID  = os.getenv("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN   = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
+TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER", "")
 
 # URL publique du serveur (Railway, ngrok en dev…)
 BASE_URL = os.getenv("BASE_URL", "https://ton-projet.railway.app")
 
-twilio_client = TwilioClient(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+
+def _get_twilio_client() -> TwilioClient:
+    """Client Twilio initialisé à la demande pour éviter un crash au démarrage."""
+    return TwilioClient(
+        os.getenv("TWILIO_ACCOUNT_SID"),
+        os.getenv("TWILIO_AUTH_TOKEN"),
+    )
 
 app = FastAPI(title="Robot Éligibilité Énergétique")
 
@@ -236,7 +240,7 @@ async def amd_statut(request: Request):
             marquer_messagerie(numero_ligne)
         # Raccroche l'appel via l'API Twilio
         try:
-            twilio_client.calls(call_sid).update(status="completed")
+            _get_twilio_client().calls(call_sid).update(status="completed")
         except Exception as e:
             print(f"[AMD] Impossible de raccrocher {call_sid} : {e}")
         _nettoyer_session(call_sid)
@@ -288,7 +292,7 @@ async def lancer_appel(request: Request):
     try:
         # Crée la session avant l'appel pour qu'elle soit prête au décrochage
         gestionnaire = GestionnaireConversation(nom)
-        call = twilio_client.calls.create(
+        call = _get_twilio_client().calls.create(
             to=telephone,
             from_=TWILIO_PHONE_NUMBER,
             url=f"{BASE_URL}/appel-decroche",

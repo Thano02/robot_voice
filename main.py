@@ -5,6 +5,7 @@
 import os
 import uuid
 import asyncio
+from urllib.parse import urlencode
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import PlainTextResponse
 from twilio.twiml.voice_response import VoiceResponse, Gather
@@ -111,18 +112,22 @@ async def appel_decroche(request: Request):
     Reçoit : CallSid, To, From, CallStatus, etc.
     """
     form = await request.form()
-    call_sid     = form.get("CallSid", "")
-    call_status  = form.get("CallStatus", "")
+    call_sid    = form.get("CallSid", "")
+    call_status = form.get("CallStatus", "")
 
-    print(f"[Webhook] Appel décroché | SID={call_sid} | Status={call_status}")
+    # Récupère nom et numero_ligne depuis les query params de l'URL
+    nom          = request.query_params.get("nom", "Prospect")
+    numero_ligne = int(request.query_params.get("numero_ligne", 0))
 
-    # --- Récupère le contexte de session (créé par caller.py) -----------------
-    session = sessions_actives.get(call_sid)
-    if not session:
-        print(f"[Webhook] Session introuvable pour SID={call_sid}")
-        return Response(content=twiml_raccrocher(), media_type="text/xml")
+    print(f"[Webhook] Appel décroché | SID={call_sid} | Status={call_status} | {nom} | Ligne={numero_ligne}")
 
-    gestionnaire: GestionnaireConversation = session["gestionnaire"]
+    # Crée la session ici (résistant aux redémarrages Railway entre /lancer-appel et le décrochage)
+    gestionnaire = GestionnaireConversation(nom)
+    sessions_actives[call_sid] = {
+        "gestionnaire": gestionnaire,
+        "numero_ligne": numero_ligne,
+        "silences":     0,
+    }
 
     # Génère et joue le message d'introduction
     intro = gestionnaire.demarrer()
@@ -334,12 +339,12 @@ async def lancer_appel(request: Request):
         return {"erreur": "Champs 'telephone' et 'numero_ligne' requis."}
 
     try:
-        # Crée la session avant l'appel pour qu'elle soit prête au décrochage
-        gestionnaire = GestionnaireConversation(nom)
+        # Passe nom et numero_ligne dans l'URL du webhook pour résister aux redémarrages
+        params_webhook = urlencode({"nom": nom, "numero_ligne": numero_ligne})
         call = _get_twilio_client().calls.create(
             to=telephone,
             from_=TWILIO_PHONE_NUMBER,
-            url=f"{BASE_URL}/appel-decroche",
+            url=f"{BASE_URL}/appel-decroche?{params_webhook}",
             status_callback=f"{BASE_URL}/statut-appel",
             status_callback_method="POST",
             machine_detection="DetectMessageEnd",           # Détection messagerie
@@ -348,12 +353,6 @@ async def lancer_appel(request: Request):
             async_amd_status_callback_method="POST",
             timeout=30,                                     # Secondes avant "pas répondu"
         )
-
-        sessions_actives[call.sid] = {
-            "gestionnaire": gestionnaire,
-            "numero_ligne": numero_ligne,
-            "silences":     0,
-        }
 
         print(f"[Appel] Initié | SID={call.sid} | {nom} | {telephone}")
         return {"call_sid": call.sid, "statut": "en_cours"}

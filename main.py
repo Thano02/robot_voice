@@ -161,63 +161,81 @@ async def reponse_prospect(request: Request):
     Twilio envoie la transcription (ou l'audio) après que le prospect a parlé.
     On passe la réponse à GPT-4o et on joue la prochaine réplique.
     """
-    form = await request.form()
-    call_sid            = form.get("CallSid", "")
-    speech_result       = form.get("SpeechResult", "")       # Transcription Twilio (basique)
-    recording_url       = form.get("RecordingUrl", "")       # Si on utilise <Record>
-    confidence          = float(form.get("Confidence", 0))
+    try:
+        form = await request.form()
+        call_sid      = form.get("CallSid", "")
+        speech_result = form.get("SpeechResult", "")
+        recording_url = form.get("RecordingUrl", "")
+        confidence    = float(form.get("Confidence", 0) or 0)
 
-    print(f"[Webhook] Réponse SID={call_sid} | Confiance={confidence:.2f} | Texte='{speech_result}'")
+        print(f"[Webhook] Réponse SID={call_sid} | Confiance={confidence:.2f} | Texte='{speech_result}'")
 
-    session = sessions_actives.get(call_sid)
-    if not session:
-        return Response(content=twiml_raccrocher(), media_type="text/xml")
+        session = sessions_actives.get(call_sid)
+        if not session:
+            return Response(content=twiml_raccrocher(), media_type="text/xml")
 
-    gestionnaire: GestionnaireConversation = session["gestionnaire"]
+        gestionnaire: GestionnaireConversation = session["gestionnaire"]
 
-    # Si pas de transcription Twilio, utilise Whisper sur l'enregistrement
-    if not speech_result and recording_url:
-        speech_result = await _transcrire_enregistrement(recording_url)
+        # Si pas de transcription Twilio, utilise Whisper sur l'enregistrement
+        if not speech_result and recording_url:
+            speech_result = await _transcrire_enregistrement(recording_url)
 
-    # Si toujours vide → silence / incompréhension
-    if not speech_result:
-        replique = "Je n'ai pas bien entendu, pourriez-vous répéter ?"
-    else:
-        replique = gestionnaire.repondre(speech_result)
+        # Lance l'extraction des données en arrière-plan (ne bloque pas la réponse)
+        if speech_result:
+            asyncio.create_task(
+                asyncio.to_thread(gestionnaire.extraire_en_arriere_plan, speech_result)
+            )
 
-    # Fin de conversation
-    if gestionnaire.conversation_terminee:
-        audio = texte_vers_audio(replique)
-        _sauvegarder_resultats(call_sid, gestionnaire)
-        # Joue l'au-revoir puis raccroche
-        audio_url = _stocker_audio(audio)
+        # Si toujours vide → silence / incompréhension
+        if not speech_result:
+            replique = "Je n'ai pas bien entendu, pourriez-vous répéter ?"
+        else:
+            replique = await asyncio.to_thread(gestionnaire.repondre, speech_result)
+
+        # Fin de conversation
+        if gestionnaire.conversation_terminee:
+            try:
+                audio = await asyncio.to_thread(texte_vers_audio, replique)
+            except Exception:
+                audio = None
+            _sauvegarder_resultats(call_sid, gestionnaire)
+            response = VoiceResponse()
+            if audio:
+                response.play(_stocker_audio(audio))
+            else:
+                response.say(replique, language="fr-FR")
+            response.pause(length=1)
+            response.hangup()
+            return Response(content=str(response), media_type="text/xml")
+
+        # Continue la conversation
+        try:
+            audio = await asyncio.to_thread(texte_vers_audio, replique)
+            twiml = twiml_jouer_audio(audio, f"{BASE_URL}/reponse")
+        except Exception as e:
+            print(f"[ElevenLabs] Erreur TTS : {e}")
+            response = VoiceResponse()
+            gather = Gather(
+                input="speech",
+                action=f"{BASE_URL}/reponse",
+                method="POST",
+                language="fr-FR",
+                speech_timeout="auto",
+                timeout=8,
+            )
+            gather.say(replique, language="fr-FR")
+            response.append(gather)
+            response.redirect(f"{BASE_URL}/silence", method="POST")
+            twiml = str(response)
+
+        return Response(content=twiml, media_type="text/xml")
+
+    except Exception as e:
+        print(f"[/reponse] Erreur non gérée : {e}")
         response = VoiceResponse()
-        response.play(audio_url)
-        response.pause(length=1)
+        response.say("Une erreur s'est produite. Nous vous rappellerons bientôt.", language="fr-FR")
         response.hangup()
         return Response(content=str(response), media_type="text/xml")
-
-    # Continue la conversation
-    try:
-        audio = texte_vers_audio(replique)
-        twiml = twiml_jouer_audio(audio, f"{BASE_URL}/reponse")
-    except Exception as e:
-        print(f"[ElevenLabs] Erreur TTS : {e}")
-        response = VoiceResponse()
-        gather = Gather(
-            input="speech",
-            action=f"{BASE_URL}/reponse",
-            method="POST",
-            language="fr-FR",
-            speech_timeout="auto",
-            timeout=8,
-        )
-        gather.say(replique, language="fr-FR")
-        response.append(gather)
-        response.redirect(f"{BASE_URL}/silence", method="POST")
-        twiml = str(response)
-
-    return Response(content=twiml, media_type="text/xml")
 
 
 # --- Webhook : silence / pas de réponse ---------------------------------------

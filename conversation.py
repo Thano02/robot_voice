@@ -126,15 +126,13 @@ class GestionnaireConversation:
         """
         Prend la transcription de la réponse du prospect,
         l'envoie à GPT-4o et retourne la prochaine réplique du robot.
+        L'extraction des données se fait séparément (via extraire_en_arriere_plan).
         """
         if self.conversation_terminee:
             return ""
 
         # Ajoute la réponse du prospect
         self.historique.append({"role": "user", "content": texte_utilisateur})
-
-        # Extrait silencieusement les données structurées en parallèle
-        self._extraire_reponses(texte_utilisateur)
 
         # Demande la prochaine réplique à GPT-4o
         try:
@@ -157,6 +155,10 @@ class GestionnaireConversation:
             self.conversation_terminee = True
 
         return replique
+
+    def extraire_en_arriere_plan(self, texte_utilisateur: str):
+        """Extrait les données structurées — appelé en arrière-plan pour ne pas bloquer."""
+        self._extraire_reponses(texte_utilisateur)
 
     def _extraire_reponses(self, texte: str):
         """

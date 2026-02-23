@@ -147,10 +147,10 @@ def verifier_serveur_disponible(base_url: str) -> bool:
         return False
 
 
-async def poller_resultats(nb_appels: int, timeout_minutes: int = 10):
+async def poller_resultats(nb_appels: int, timeout_secondes: int = 30):
     """
     Attend les résultats des appels depuis Railway et les écrit dans Excel local.
-    Polls GET /resultats toutes les 15 secondes jusqu'à avoir tous les résultats
+    Polls GET /resultats toutes les 5 secondes jusqu'à avoir tous les résultats
     ou jusqu'au timeout.
     """
     print(f"\n[Caller] En attente des résultats ({nb_appels} appel(s) en cours)...")
@@ -163,8 +163,8 @@ async def poller_resultats(nb_appels: int, timeout_minutes: int = 10):
     async with httpx.AsyncClient() as client:
         while resultats_recus < nb_appels:
             # Timeout global
-            if time.time() - debut > timeout_minutes * 60:
-                print(f"[Caller] Timeout atteint ({timeout_minutes} min). "
+            if time.time() - debut > timeout_secondes:
+                print(f"[Caller] Timeout atteint ({timeout_secondes}s). "
                       f"{resultats_recus}/{nb_appels} résultats reçus.")
                 break
 
@@ -232,7 +232,7 @@ def main():
 
     if nb_lances > 0:
         # Attend et récupère les résultats depuis Railway → écrit dans Excel local
-        asyncio.run(poller_resultats(nb_lances))
+        asyncio.run(poller_resultats(nb_lances, timeout_secondes=30))
 
 
 if __name__ == "__main__":

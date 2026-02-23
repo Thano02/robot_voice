@@ -9,16 +9,17 @@ FICHIER_EXCEL = "prospects.xlsx"
 # Correspondance entre les colonnes Excel et les noms de champs
 COLONNES = {
     "telephone":          1,   # A
-    "nom":                2,   # B
-    "statut":             3,   # C
-    "proprietaire":       4,   # D
-    "type_logement":      5,   # E
-    "annee_construction": 6,   # F
-    "chauffage_actuel":   7,   # G
-    "revenus":            8,   # H
-    "eligibilite":        9,   # I
-    "notes":              10,  # J
-    "date_appel":         11,  # K
+    "prenom":             2,   # B
+    "nom":                3,   # C
+    "statut":             4,   # D
+    "proprietaire":       5,   # E
+    "type_logement":      6,   # F
+    "annee_construction": 7,   # G
+    "chauffage_actuel":   8,   # H
+    "revenus":            9,   # I
+    "eligibilite":        10,  # J
+    "notes":              11,  # K
+    "date_appel":         12,  # L
 }
 
 
@@ -34,16 +35,28 @@ def lire_prospects():
 
     # Parcourt toutes les lignes en sautant l'en-tête (ligne 1)
     for numero_ligne, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-        telephone   = row[0]  # Colonne A
-        nom         = row[1]  # Colonne B
-        statut      = row[2]  # Colonne C
+        telephone   = row[0]  # Colonne A : Téléphone
+        prenom      = row[1]  # Colonne B : Prénom
+        nom_famille = row[2]  # Colonne C : Nom
+        statut      = row[3]  # Colonne D : Statut
 
         # On ne traite que les prospects à appeler (accepte avec ou sans accent)
-        if statut and statut.strip().lower() in ("à appeler", "a appeler"):
+        if statut and str(statut).strip().lower() in ("à appeler", "a appeler"):
+            # Formatte le numéro en E.164 (+33XXXXXXXXX)
+            tel = str(telephone).strip() if telephone else ""
+            if tel and not tel.startswith("+"):
+                # Supprime le 0 initial si présent puis ajoute +33
+                tel = "+33" + (tel[1:] if tel.startswith("0") else tel)
+
+            nom_complet = " ".join(filter(None, [
+                str(prenom).strip() if prenom else "",
+                str(nom_famille).strip() if nom_famille else "",
+            ])) or "Inconnu"
+
             prospects.append({
                 "numero_ligne": numero_ligne,
-                "telephone":    str(telephone).strip() if telephone else "",
-                "nom":          str(nom).strip() if nom else "Inconnu",
+                "telephone":    tel,
+                "nom":          nom_complet,
             })
 
     wb.close()

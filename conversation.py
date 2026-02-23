@@ -114,9 +114,9 @@ class GestionnaireConversation:
     def demarrer(self) -> str:
         """Génère le message d'introduction de l'appel."""
         introduction = (
-            f"Bonjour, je suis Sophie, conseillère en rénovation énergétique. "
-            f"Je cherche à joindre {self.nom_prospect}. "
-            f"Je vous appelle pour vous informer des aides disponibles pour rénover votre logement. "
+            f"Bonjour {self.nom_prospect}, comment allez-vous ? "
+            f"J'ai vu que vous avez souscrit à notre programme "
+            f"et cet appel vise à voir si vous êtes éligible aux aides énergétiques. "
             f"Avez-vous quelques minutes ?"
         )
         self.historique.append({"role": "assistant", "content": introduction})

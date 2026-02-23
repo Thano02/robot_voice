@@ -8,7 +8,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Client initialisé à la demande pour éviter un crash au démarrage si la clé est absente
+def _get_client() -> OpenAI:
+    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # --- Prompt système -----------------------------------------------------------
 PROMPT_SYSTEME = """
@@ -136,7 +138,7 @@ class GestionnaireConversation:
 
         # Demande la prochaine réplique à GPT-4o
         try:
-            completion = client.chat.completions.create(
+            completion = _get_client().chat.completions.create(
                 model="gpt-4o",
                 messages=self.historique,
                 temperature=0.7,
@@ -178,7 +180,7 @@ Exemple : {{"proprietaire": "propriétaire", "type_logement": "maison"}}
 Si une info n'est pas présente, ne l'inclus pas dans le JSON.
 """
         try:
-            res = client.chat.completions.create(
+            res = _get_client().chat.completions.create(
                 model="gpt-4o-mini",  # Modèle léger pour l'extraction
                 messages=[{"role": "user", "content": prompt_extraction}],
                 temperature=0,

@@ -11,7 +11,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- Clients ------------------------------------------------------------------
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+def _get_openai_client() -> OpenAI:
+    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")
@@ -84,7 +85,7 @@ def audio_vers_texte(audio_bytes: bytes, format_audio: str = "wav") -> str:
     fichier_audio.name = f"audio.{format_audio}"
 
     try:
-        transcription = openai_client.audio.transcriptions.create(
+        transcription = _get_openai_client().audio.transcriptions.create(
             model="whisper-1",
             file=fichier_audio,
             language="fr",  # Forcer le français pour de meilleures performances

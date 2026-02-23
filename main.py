@@ -183,12 +183,6 @@ async def reponse_prospect(request: Request):
         if not speech_result and recording_url:
             speech_result = await _transcrire_enregistrement(recording_url)
 
-        # Lance l'extraction des données en arrière-plan (ne bloque pas la réponse)
-        if speech_result:
-            asyncio.create_task(
-                asyncio.to_thread(gestionnaire.extraire_en_arriere_plan, speech_result)
-            )
-
         # Si toujours vide → silence / incompréhension
         if not speech_result:
             replique = "Je n'ai pas bien entendu, pourriez-vous répéter ?"

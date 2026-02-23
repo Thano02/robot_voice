@@ -52,7 +52,7 @@ def texte_vers_audio(texte: str) -> bytes:
 
     payload = {
         "text":           texte,
-        "model_id":       "eleven_multilingual_v2",  # Supporte le français
+        "model_id":       "eleven_turbo_v2_5",  # Faible latence, supporte le français
         "voice_settings": PARAMETRES_VOIX,
     }
 

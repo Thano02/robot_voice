@@ -125,8 +125,8 @@ class GestionnaireConversation:
     def repondre(self, texte_utilisateur: str) -> str:
         """
         Prend la transcription de la réponse du prospect,
-        l'envoie à GPT-4o et retourne la prochaine réplique du robot.
-        L'extraction des données se fait séparément (via extraire_en_arriere_plan).
+        extrait les données structurées, puis génère la prochaine réplique.
+        Utilise gpt-4o-mini pour minimiser la latence.
         """
         if self.conversation_terminee:
             return ""
@@ -134,17 +134,20 @@ class GestionnaireConversation:
         # Ajoute la réponse du prospect
         self.historique.append({"role": "user", "content": texte_utilisateur})
 
-        # Demande la prochaine réplique à GPT-4o
+        # Extraction des données (synchrone, rapide avec gpt-4o-mini)
+        self._extraire_reponses(texte_utilisateur)
+
+        # Génère la prochaine réplique
         try:
             completion = _get_client().chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4o-mini",
                 messages=self.historique,
                 temperature=0.7,
-                max_tokens=300,
+                max_tokens=150,
             )
             replique = completion.choices[0].message.content.strip()
         except Exception as e:
-            print(f"[GPT-4o] Erreur : {e}")
+            print(f"[GPT] Erreur : {e}")
             replique = "Je suis désolée, une erreur technique s'est produite. Nous vous rappellerons."
 
         self.historique.append({"role": "assistant", "content": replique})
@@ -155,10 +158,6 @@ class GestionnaireConversation:
             self.conversation_terminee = True
 
         return replique
-
-    def extraire_en_arriere_plan(self, texte_utilisateur: str):
-        """Extrait les données structurées — appelé en arrière-plan pour ne pas bloquer."""
-        self._extraire_reponses(texte_utilisateur)
 
     def _extraire_reponses(self, texte: str):
         """

@@ -158,7 +158,7 @@ async def poller_resultats(nb_appels: int, timeout_minutes: int = 10):
 
     resultats_recus = 0
     debut = time.time()
-    intervalle = 15  # secondes entre chaque poll
+    intervalle = 5  # secondes entre chaque poll
 
     async with httpx.AsyncClient() as client:
         while resultats_recus < nb_appels:

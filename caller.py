@@ -147,14 +147,15 @@ def verifier_serveur_disponible(base_url: str) -> bool:
         return False
 
 
-async def poller_resultats(nb_appels: int, timeout_secondes: int = 30):
+async def poller_resultats(nb_appels: int, timeout_secondes: int = 300):
     """
     Attend les résultats des appels depuis Railway et les écrit dans Excel local.
     Polls GET /resultats toutes les 5 secondes jusqu'à avoir tous les résultats
-    ou jusqu'au timeout.
+    ou jusqu'au timeout (5 min par défaut).
+    Le programme quitte immédiatement dès que tous les résultats sont reçus.
     """
     print(f"\n[Caller] En attente des résultats ({nb_appels} appel(s) en cours)...")
-    print("[Caller] Les résultats seront écrits dans prospects.xlsx au fur et à mesure.")
+    print("[Caller] Le programme se terminera dès la fin des appels.")
 
     resultats_recus = 0
     debut = time.time()
@@ -232,7 +233,7 @@ def main():
 
     if nb_lances > 0:
         # Attend et récupère les résultats depuis Railway → écrit dans Excel local
-        asyncio.run(poller_resultats(nb_lances, timeout_secondes=30))
+        asyncio.run(poller_resultats(nb_lances))
 
 
 if __name__ == "__main__":

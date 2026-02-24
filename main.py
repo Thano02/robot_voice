@@ -75,21 +75,22 @@ def _stocker_audio(audio_bytes: bytes) -> str:
 def twiml_jouer_audio(audio_bytes: bytes, url_suivant: str) -> str:
     """
     Construit un TwiML qui :
-    1. Joue l'audio MP3 via une URL publique (Twilio ne supporte pas les data: URIs)
-    2. Capture la réponse du prospect via <Gather>
+    1. Joue l'audio MP3 AVANT le Gather (évite que Twilio écoute pendant la lecture)
+    2. Capture la réponse du prospect via <Gather> une fois l'audio terminé
     """
     audio_url = _stocker_audio(audio_bytes)
 
     response = VoiceResponse()
+    # Play HORS du Gather : Twilio attend la fin de l'audio avant d'écouter
+    response.play(audio_url)
     gather = Gather(
         input="speech",           # Capture la voix
         action=url_suivant,       # Webhook appelé après la prise de parole
         method="POST",
         language="fr-FR",
         speech_timeout="auto",    # Détecte automatiquement la fin de parole
-        timeout=8,                # Secondes d'attente avant timeout
+        timeout=10,               # Secondes d'attente si pas de parole
     )
-    gather.play(audio_url)
     response.append(gather)
 
     # Si personne ne parle après timeout, redirige vers /silence
@@ -141,15 +142,15 @@ async def appel_decroche(request: Request):
         print(f"[ElevenLabs] Erreur TTS : {e}")
         # Fallback : voix Twilio native si ElevenLabs échoue
         response = VoiceResponse()
+        response.say(intro, language="fr-FR")
         gather = Gather(
             input="speech",
             action=f"{BASE_URL}/reponse",
             method="POST",
             language="fr-FR",
             speech_timeout="auto",
-            timeout=8,
+            timeout=10,
         )
-        gather.say(intro, language="fr-FR")
         response.append(gather)
         response.redirect(f"{BASE_URL}/silence", method="POST")
         twiml = str(response)
@@ -212,15 +213,15 @@ async def reponse_prospect(request: Request):
         except Exception as e:
             print(f"[ElevenLabs] Erreur TTS : {e}")
             response = VoiceResponse()
+            response.say(replique, language="fr-FR")
             gather = Gather(
                 input="speech",
                 action=f"{BASE_URL}/reponse",
                 method="POST",
                 language="fr-FR",
                 speech_timeout="auto",
-                timeout=8,
+                timeout=10,
             )
-            gather.say(replique, language="fr-FR")
             response.append(gather)
             response.redirect(f"{BASE_URL}/silence", method="POST")
             twiml = str(response)
@@ -269,15 +270,15 @@ async def silence(request: Request):
     except Exception as e:
         print(f"[ElevenLabs] Erreur TTS : {e}")
         response = VoiceResponse()
+        response.say(replique, language="fr-FR")
         gather = Gather(
             input="speech",
             action=f"{BASE_URL}/reponse",
             method="POST",
             language="fr-FR",
             speech_timeout="auto",
-            timeout=8,
+            timeout=10,
         )
-        gather.say(replique, language="fr-FR")
         response.append(gather)
         response.redirect(f"{BASE_URL}/silence", method="POST")
         twiml = str(response)

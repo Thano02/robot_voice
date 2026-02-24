@@ -14,33 +14,37 @@ def _get_client() -> OpenAI:
 
 # --- Prompt système -----------------------------------------------------------
 PROMPT_SYSTEME = """
-Tu es Sophie, une conseillère téléphonique spécialisée dans les aides énergétiques françaises
-(MaPrimeRénov, CEE, pompe à chaleur, isolation).
-Tu appelles des particuliers pour évaluer leur éligibilité à ces aides.
+Tu es Tom, un conseiller de la société Energie AI, spécialisé dans les aides à la rénovation énergétique (MaPrimeRénov, CEE, pompe à chaleur, isolation).
+Tu appelles des particuliers pour évaluer leur éligibilité.
 
 Ton comportement :
-- Sois naturelle, chaleureuse, professionnelle et concise.
-- Ne lis jamais une liste de questions d'un coup ; pose UNE question à la fois.
-- Si la réponse est floue, reformule poliment pour obtenir une réponse claire.
-- Si la personne est hors sujet ou hostile, recentre la conversation calmement.
-- Si la personne demande à être rappelée ou dit qu'elle n'est pas disponible, remercie-la et raccroche.
-- Ne promets JAMAIS un montant précis d'aide, seulement une éligibilité potentielle.
+- Parle comme une vraie personne au téléphone : phrases courtes, ton naturel et chaleureux.
+- Jamais de langage robotique ou trop formel.
+- Pose UNE seule question à la fois. N'enchaîne jamais plusieurs questions.
+- Si la réponse est floue, reformule simplement pour clarifier.
+- Si la personne n'est pas disponible ou veut être rappelée, excuse-toi et conclus poliment.
+- Ne promets jamais un montant précis d'aide.
 - Parle uniquement en français.
 
-Ordre des questions (une à la fois) :
-1. Êtes-vous propriétaire ou locataire de votre logement ?
-2. Votre logement est-il une maison ou un appartement ?
-3. En quelle année a-t-il été construit (approximativement) ?
-4. Quel est votre système de chauffage actuel ? (fioul, gaz, électrique, autre)
-5. Dans quelle tranche de revenus vous situez-vous ?
-   - Modeste (ex : moins de 21 000 € /an pour 1 personne)
-   - Intermédiaire (entre 21 000 € et 30 000 €)
-   - Supérieur (au-dessus de 30 000 €)
+Déroulement de l'appel :
+1. Quand la personne répond à ton "Bonjour, comment allez-vous ?", présente-toi naturellement :
+   tu t'appelles Tom, tu es de la société Energie AI, et tu appelles pour voir si la personne
+   est éligible à des aides pour la rénovation énergétique. Demande-lui si elle a deux minutes.
+2. Si elle est disponible, pose ces questions UNE par UNE, de façon conversationnelle :
+   a. Vous êtes propriétaire ou locataire ?
+   b. C'est une maison ou un appartement ?
+   c. Il a été construit à peu près en quelle année ?
+   d. Vous avez quel type de chauffage ? (fioul, gaz, électrique, autre)
+   e. Et pour les revenus du foyer, vous êtes plutôt dans quelle tranche ?
+      Modeste (moins de 21 000 €/an), intermédiaire (21 à 30 000 €), ou supérieur ?
+3. Une fois les 5 réponses obtenues, conclus en 1 ou 2 phrases courtes et naturelles.
+   Indique brièvement si la personne semble éligible, puis dis que tu transmets le dossier.
 
-Quand tu as les 5 réponses, conclus avec une phrase naturelle indiquant le résultat
-et dis que tu vas transmettre le dossier à un conseiller humain.
+RÈGLE ABSOLUE pour la conclusion et l'au revoir :
+- Maximum 20 mots. Phrase courte. Exemple : "Très bien, je transmets votre dossier. Bonne journée !"
+- Ne fais JAMAIS de longues phrases à la fin. Une seule phrase d'au revoir, c'est tout.
 
-Réponds UNIQUEMENT avec du texte à dire à voix haute (pas de markdown, pas de liste).
+Réponds UNIQUEMENT avec du texte à dire à voix haute. Pas de markdown, pas de listes, pas de symboles.
 """
 
 # Clés extraites des réponses GPT
@@ -112,13 +116,8 @@ class GestionnaireConversation:
         })
 
     def demarrer(self) -> str:
-        """Génère le message d'introduction de l'appel."""
-        introduction = (
-            f"Bonjour {self.nom_prospect}, comment allez-vous ? "
-            f"J'ai vu que vous avez souscrit à notre programme "
-            f"et cet appel vise à voir si vous êtes éligible aux aides énergétiques. "
-            f"Avez-vous quelques minutes ?"
-        )
+        """Génère le message d'introduction : juste un bonjour, la présentation vient après."""
+        introduction = f"Bonjour {self.nom_prospect}, comment allez-vous ?"
         self.historique.append({"role": "assistant", "content": introduction})
         return introduction
 
@@ -143,17 +142,17 @@ class GestionnaireConversation:
                 model="gpt-4o-mini",
                 messages=self.historique,
                 temperature=0.7,
-                max_tokens=150,
+                max_tokens=100,  # Court pour éviter les longues phrases TTS
             )
             replique = completion.choices[0].message.content.strip()
         except Exception as e:
             print(f"[GPT] Erreur : {e}")
-            replique = "Je suis désolée, une erreur technique s'est produite. Nous vous rappellerons."
+            replique = "Je suis désolé, une erreur s'est produite. Nous vous rappellerons."
 
         self.historique.append({"role": "assistant", "content": replique})
 
         # Détecte si la conversation est terminée
-        mots_fin = ["bonne journée", "au revoir", "raccroche", "transmettre le dossier", "conseiller humain"]
+        mots_fin = ["bonne journée", "au revoir", "bonne soirée", "transmets votre dossier", "transmettre votre dossier", "passe une bonne"]
         if any(mot in replique.lower() for mot in mots_fin):
             self.conversation_terminee = True
 
@@ -220,14 +219,14 @@ if __name__ == "__main__":
     gc = GestionnaireConversation("Jean Dupont")
 
     intro = gc.demarrer()
-    print(f"Sophie : {intro}\n")
+    print(f"Tom  : {intro}\n")
 
     while not gc.conversation_terminee:
-        reponse = input("Vous    : ").strip()
+        reponse = input("Vous : ").strip()
         if not reponse:
             continue
         replique = gc.repondre(reponse)
-        print(f"Sophie  : {replique}\n")
+        print(f"Tom  : {replique}\n")
 
     print("\n=== Résultats collectés ===")
     import json

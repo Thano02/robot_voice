@@ -3,6 +3,7 @@
 # et calcule le résultat final.
 
 import os
+import concurrent.futures
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -124,30 +125,21 @@ class GestionnaireConversation:
     def repondre(self, texte_utilisateur: str) -> str:
         """
         Prend la transcription de la réponse du prospect,
-        extrait les données structurées, puis génère la prochaine réplique.
-        Utilise gpt-4o-mini pour minimiser la latence.
+        lance extraction ET génération de réponse en parallèle pour réduire la latence,
+        puis retourne la réplique.
         """
         if self.conversation_terminee:
             return ""
 
-        # Ajoute la réponse du prospect
+        # Ajoute la réponse du prospect à l'historique
         self.historique.append({"role": "user", "content": texte_utilisateur})
 
-        # Extraction des données (synchrone, rapide avec gpt-4o-mini)
-        self._extraire_reponses(texte_utilisateur)
-
-        # Génère la prochaine réplique
-        try:
-            completion = _get_client().chat.completions.create(
-                model="gpt-4o-mini",
-                messages=self.historique,
-                temperature=0.7,
-                max_tokens=100,  # Court pour éviter les longues phrases TTS
-            )
-            replique = completion.choices[0].message.content.strip()
-        except Exception as e:
-            print(f"[GPT] Erreur : {e}")
-            replique = "Je suis désolé, une erreur s'est produite. Nous vous rappellerons."
+        # Lance extraction et génération GPT EN PARALLÈLE (~2s gagnées par échange)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            future_extraction = executor.submit(self._extraire_reponses, texte_utilisateur)
+            future_replique   = executor.submit(self._generer_replique)
+            future_extraction.result()          # Attend la fin de l'extraction
+            replique = future_replique.result() # Récupère la réplique GPT
 
         self.historique.append({"role": "assistant", "content": replique})
 
@@ -157,6 +149,20 @@ class GestionnaireConversation:
             self.conversation_terminee = True
 
         return replique
+
+    def _generer_replique(self) -> str:
+        """Génère la prochaine réplique de Tom via GPT-4o-mini."""
+        try:
+            completion = _get_client().chat.completions.create(
+                model="gpt-4o-mini",
+                messages=self.historique,
+                temperature=0.7,
+                max_tokens=100,
+            )
+            return completion.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"[GPT] Erreur : {e}")
+            return "Je suis désolé, une erreur s'est produite. Nous vous rappellerons."
 
     def _extraire_reponses(self, texte: str):
         """

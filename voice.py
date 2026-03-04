@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-TTS_VOICE = os.getenv("TTS_VOICE", "echo")   # echo (homme doux), onyx (homme grave), nova (femme)
+TTS_VOICE = os.getenv("TTS_VOICE", "nova")   # nova (femme naturelle FR), echo (homme), onyx (homme grave)
 TTS_MODEL = os.getenv("TTS_MODEL", "tts-1")  # tts-1 (rapide ~1s) ou tts-1-hd (qualité ~4s)
 
 

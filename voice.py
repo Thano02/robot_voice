@@ -36,7 +36,7 @@ def texte_vers_audio(texte: str) -> bytes:
         output_format="mp3_44100_128",
     )
     audio_bytes = b"".join(audio_stream)
-    print(f"[ElevenLabs] Audio généré ({len(audio_bytes)} bytes) | '{texte[:60]}...'")
+    print(f"[ElevenLabs] Audio généré ({len(audio_bytes)} bytes) | voice_id={ELEVENLABS_VOICE_ID} | '{texte[:60]}...'")
     return audio_bytes
 
 

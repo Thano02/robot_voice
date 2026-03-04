@@ -1,33 +1,42 @@
 # voice.py
-# OpenAI TTS : conversion texte → audio (bytes MP3)
-# OpenAI Whisper : conversion audio → texte
+# ElevenLabs TTS : conversion texte → audio (bytes MP3)
+# OpenAI Whisper  : conversion audio → texte
 
 import os
 import io
+from elevenlabs.client import ElevenLabs
+from elevenlabs import VoiceSettings
 from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
-TTS_VOICE = os.getenv("TTS_VOICE", "nova")   # nova (femme), echo (homme), onyx (homme grave)
-TTS_MODEL = os.getenv("TTS_MODEL", "tts-1")  # tts-1 (rapide) ou tts-1-hd (qualité)
+# eleven_multilingual_v2 : meilleure qualité pour le français
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "XB0fDUnXU5powFXDhCwa")  # Charlotte (naturelle, multilingue)
+ELEVENLABS_MODEL    = os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2")
 
 
-def _get_openai_client() -> OpenAI:
-    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+def _get_eleven_client() -> ElevenLabs:
+    return ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
 
 
 def texte_vers_audio(texte: str) -> bytes:
-    """Convertit du texte en audio MP3 via OpenAI TTS."""
-    client = _get_openai_client()
-    reponse = client.audio.speech.create(
-        model=TTS_MODEL,
-        voice=TTS_VOICE,
-        input=texte,
-        response_format="mp3",
+    """Convertit du texte en audio MP3 via ElevenLabs."""
+    client = _get_eleven_client()
+    audio_stream = client.text_to_speech.convert(
+        voice_id=ELEVENLABS_VOICE_ID,
+        model_id=ELEVENLABS_MODEL,
+        text=texte,
+        voice_settings=VoiceSettings(
+            stability=0.35,          # Moins stable = plus expressif
+            similarity_boost=0.80,   # Fidélité à la voix
+            style=0.45,              # Style prononcé pour sonner humain
+            use_speaker_boost=True,
+        ),
+        output_format="mp3_44100_128",
     )
-    audio_bytes = reponse.content
-    print(f"[TTS] Audio généré ({len(audio_bytes)} bytes) | voix={TTS_VOICE} | '{texte[:60]}...'")
+    audio_bytes = b"".join(audio_stream)
+    print(f"[ElevenLabs] Audio généré ({len(audio_bytes)} bytes) | '{texte[:60]}...'")
     return audio_bytes
 
 
@@ -36,7 +45,7 @@ def audio_vers_texte(audio_bytes: bytes, format_audio: str = "wav") -> str:
     fichier_audio = io.BytesIO(audio_bytes)
     fichier_audio.name = f"audio.{format_audio}"
     try:
-        transcription = _get_openai_client().audio.transcriptions.create(
+        transcription = OpenAI(api_key=os.getenv("OPENAI_API_KEY")).audio.transcriptions.create(
             model="whisper-1",
             file=fichier_audio,
             language="fr",

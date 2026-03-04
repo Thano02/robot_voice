@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-TTS_VOICE = os.getenv("TTS_VOICE", "onyx")   # onyx, nova, shimmer, echo, alloy, fable
-TTS_MODEL = os.getenv("TTS_MODEL", "tts-1-hd")  # tts-1 (rapide) ou tts-1-hd (qualité)
+TTS_VOICE = os.getenv("TTS_VOICE", "echo")   # echo (homme doux), onyx (homme grave), nova (femme)
+TTS_MODEL = os.getenv("TTS_MODEL", "tts-1")  # tts-1 (rapide ~1s) ou tts-1-hd (qualité ~4s)
 
 
 def _get_openai_client() -> OpenAI:

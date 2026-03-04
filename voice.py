@@ -22,11 +22,14 @@ ELEVENLABS_TTS_URL = (
     f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
 )
 
-# Paramètres de voix ElevenLabs (ajuste selon la voix choisie)
+# Paramètres de voix ElevenLabs
+# stability bas    = plus de variation naturelle (moins robotique)
+# style élevé      = plus d'émotion et d'intonation
+# similarity réduit = moins rigide sur le clone, rendu plus fluide
 PARAMETRES_VOIX = {
-    "stability":         0.55,  # Stabilité : 0 (expressif) → 1 (stable)
-    "similarity_boost":  0.75,  # Fidélité à la voix clonée
-    "style":             0.20,  # Style (disponible sur v2)
+    "stability":         0.30,  # Bas = plus expressif, moins monotone
+    "similarity_boost":  0.60,  # Moins rigide = rendu plus naturel
+    "style":             0.50,  # Élevé = plus d'intonation et d'émotion
     "use_speaker_boost": True,
 }
 
